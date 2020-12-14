@@ -2,7 +2,8 @@ require("dotenv").config();
 const express = require("express");
 const ejs = require("ejs");
 const mongoose = require('mongoose');
-const encrypt = require("mongoose-encryption");
+//const encrypt = require("mongoose-encryption");level 2 by mongoose-encryption
+const md5 = require("md5");
 const app = express();
 
 mongoose.connect('mongodb://localhost:27017/secretsDB', {
@@ -21,12 +22,7 @@ const userSchema = new mongoose.Schema({
     password:String
 })
 
-const secret = process.env.SECRET; //encryptionKey
-//userSchema.plugin(encrypt,{secret:secret}); 
-//above one will encrypt the whole thing we dont want , we just want to encrypt password
-
-userSchema.plugin(encrypt,{secret:secret,encryptedFields: ["password"]});//this line should always be before the mongoose.model line i.e the below one
-
+//const secret = process.env.SECRET; //encryptionKey not required as used when we used mongoose-encryption
 
 const User = mongoose.model("User", userSchema);
 
@@ -50,13 +46,10 @@ app.get("/register",(req,res)=>{
 
 
 app.post("/register", (req,res)=>{
-    //console.log(req.body);
-    //console.log(req.body.password); so even though we have encrypted password to store in db , here we can
-    // know the password what the user has typed 
 
     const newUser = new User({
         email:req.body.username,
-        password:req.body.password
+        password:md5(req.body.password)
     })
     newUser.save((err)=>{
         if(err){
@@ -73,9 +66,7 @@ app.post("/login", (req,res)=>{
     //console.log(req.body);
 
     let username = req.body.username;
-    let password = req.body.password;
-    //console.log(password);so even though we have encrypted password to store in db , here we can
-    // know the password what the user has typed 
+    let password = md5(req.body.password);
 
     User.findOne({
         email : username
@@ -95,6 +86,6 @@ app.post("/login", (req,res)=>{
     });
 })
 
-app.listen(3000, ()=>{
+app.listen(5000, ()=>{
     console.log("server has started at port 3000 ...");
 })
