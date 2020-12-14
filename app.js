@@ -33,7 +33,7 @@ const User = mongoose.model("User", userSchema);
 
 app.use(express.json());
 app.use(express.urlencoded({extended:true}));
-app.use(express.static("public"));
+app.use(express.static("public"));//Express looks up the files in the order in which you set the static directories with the express
 app.set('view engine', 'ejs');
 
 app.get("/",(req,res)=>{
@@ -51,6 +51,8 @@ app.get("/register",(req,res)=>{
 
 app.post("/register", (req,res)=>{
     //console.log(req.body);
+    //console.log(req.body.password); so even though we have encrypted password to store in db , here we can
+    // know the password what the user has typed 
 
     const newUser = new User({
         email:req.body.username,
@@ -72,13 +74,15 @@ app.post("/login", (req,res)=>{
 
     let username = req.body.username;
     let password = req.body.password;
+    //console.log(password);so even though we have encrypted password to store in db , here we can
+    // know the password what the user has typed 
 
     User.findOne({
         email : username
     }).then((foundUser) => {
         if (!foundUser) {
             //console.log("not found")
-            res.send("not found");
+            res.send("email found");
         } else{
             //console.log(foundUser);
             if(foundUser.password === password){
@@ -91,6 +95,6 @@ app.post("/login", (req,res)=>{
     });
 })
 
-app.listen(3000, (req,res)=>{
+app.listen(3000, ()=>{
     console.log("server has started at port 3000 ...");
 })
