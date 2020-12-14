@@ -1,4 +1,4 @@
-require("dotenv").config();
+//require("dotenv").config(); //dont require .env file as we needed key for mongoose-encrytion package
 const express = require("express");
 const ejs = require("ejs");
 const mongoose = require('mongoose');
