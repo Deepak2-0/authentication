@@ -1,10 +1,31 @@
+require('dotenv').config();
 const express = require("express");
 const ejs = require("ejs");
 const mongoose = require('mongoose');
-//const md5 = require("md5");
-const bcrypt = require('bcrypt');
-const saltRounds = 10;
+// const bcrypt = require('bcrypt');
+// const saltRounds = 10;
+const session = require('express-session')
+const passport = require("passport");
+const passportLocalMongoose = require('passport-local-mongoose');
+
 const app = express();
+
+
+app.use(express.json());
+app.use(express.urlencoded({extended:true}));
+app.use(express.static("public"));//Express looks up the files in the order in which you set the static directories with the express
+app.set('view engine', 'ejs');
+
+
+app.use(session({ //NOTE this line should be below the app.use lines as this is written
+    secret: process.env.SECRET,
+    resave:false,
+    saveUninitialized:false
+}));
+
+app.use(passport.initialize());//NOTE this line should be below the app.use(session..) line as this is written
+app.use(passport.session());//NOTE this line should be below the app.use(passport.initialize()) line as this is written
+//the above line app.use(passport.session()) is used to create a seesion
 
 mongoose.connect('mongodb://localhost:27017/secretsDB', {
     useNewUrlParser: true,
@@ -16,19 +37,20 @@ mongoose.connect('mongodb://localhost:27017/secretsDB', {
         console.log('Error in DB connection: ' + err)
     }
 });
+mongoose.set("useCreateIndex", true);
 
 const userSchema = new mongoose.Schema({
     email:String,
     password:String
 })
 
+userSchema.plugin(passportLocalMongoose);//Note this line should be in between schema and mongoose.model line as this is written
+
 const User = mongoose.model("User", userSchema);
 
-
-app.use(express.json());
-app.use(express.urlencoded({extended:true}));
-app.use(express.static("public"));//Express looks up the files in the order in which you set the static directories with the express
-app.set('view engine', 'ejs');
+passport.use(User.createStrategy());
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser()); //these 3 lines should be below the mongoose.model line as this is written
 
 app.get("/",(req,res)=>{
     res.render("home"); //rendering the home.ejs file
@@ -42,56 +64,56 @@ app.get("/register",(req,res)=>{
     res.render("register"); //rendering the register.ejs file
 })
 
+app.get("/secrets", (req,res)=>{
+    if(req.isAuthenticated()){
+
+        res.render("secrets");
+    }
+    else{
+        res.redirect("/login");
+    }
+})
+
+app.get("/logout", (req,res)=>{
+    req.logout();
+    res.redirect("/");
+})
+
 
 app.post("/register", (req,res)=>{
+    console.log(req.body);
 
-    bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
+    User.register({username:req.body.username}, req.body.password, function (err,user) {
 
-        const newUser = new User({
-            email:req.body.username,
-            password:hash
-        })
-        newUser.save((err)=>{
-            if(err){
-                console.log(err);
-            }
-            else{
-                //res.render("secrets");
-                res.redirect("/login");
-            }
-        });
-        
-    });
+        if(err){
+            console.log(err);
+            res.redirect("/register");
+        }
+        else{
+            passport.authenticate("local")(req,res, function () {
+
+                res.redirect("/secrets");
+            })
+        }
+    })
 })
 
 app.post("/login", (req,res)=>{
-    //console.log(req.body);
 
-    let username = req.body.username;
-    let password = req.body.password;
-    
+    const user = new User({
+        username: req.body.username,
+        password:req.body.password
+    })
 
-    User.findOne({
-        email : username
-    }).then((foundUser) => {
-        if (!foundUser) {
-            //console.log("not found")
-            res.send("email not found");
-        } 
-        
-        else{
-            //console.log(foundUser);
-            bcrypt.compare(password, foundUser.password, function(err, result) {
-                
-                if(result === true){
-                    res.render("secrets");
-                }
-                else{
-                    res.send("incorrect password");
-                }
-
-            });
+    req.login(user, function(err) {
+        if (err) {
+            console.log(err );
+            return next(err); 
         }
+        passport.authenticate("local")(req,res, function () {
+
+            res.redirect("/secrets");
+        })
     });
 })
 
